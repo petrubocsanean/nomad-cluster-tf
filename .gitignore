@@ -1,4 +1,5 @@
 .terraform*
 terraform.tfstate*
+terraform.tfvars*
 hetzner_ssh_key
 hetzner_ssh_key.pub
