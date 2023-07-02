@@ -15,56 +15,136 @@ resource "hcloud_network_subnet" "nomad-network-subnet" {
 }
 
 # ---------------------------
-# Server config
+# Nomad Servers config
 # ---------------------------
+resource "hcloud_server" "nomad_servers" {
+  name = "nomad-server-${count.index + 1}"
+  count = var.server_count
+  image = var.vm_image
+  location = var.location
+  server_type = var.server_type
+  ssh_keys = [ hcloud_ssh_key._.id ]
+  
+  network {
+    network_id = hcloud_network.nomad-network.id
+  }
 
-resource "hcloud_server" "first_server" {
-    count = var.server_count - 2
-    name = "${var.server_name}-${count.index}"
-    server_type = var.server_type
-    location = var.server_location
-    image = var.server_image
-    ssh_keys = [ hcloud_ssh_key._.id ]
+  connection {
+    host = self.ipv4_address
+    type = "ssh"
+    user = "root"
+    private_key = tls_private_key.ssh.private_key_pem
+  }
 
-    network {
-      network_id = hcloud_network.nomad-network.id
-    }
+  depends_on = [ hcloud_network_subnet.nomad-network-subnet ]
 
-    connection {
-      host = self.ipv4_address
-      type = "ssh"
-      user = "root"
-      private_key = tls_private_key.ssh.private_key_pem
-    }
+  provisioner "file" {
+    source = "scripts/nomad-installations.sh"
+    destination = "/tmp/nomad-installations.sh"
+  }
 
-    depends_on = [ 
-        hcloud_network_subnet.nomad-network-subnet
+  provisioner "remote-exec" {
+    inline = [ 
+      # Add executable permission to the sript.
+      "chmod +x /tmp/nomad-installations.sh",
+      "/tmp/nomad-installations.sh"
      ]
+  }
 }
 
-resource "hcloud_server" "other_servers" {
-    count = var.server_count - 1
-    name = "${var.server_name}-${count.index + 1}"
-    server_type = var.server_type
-    location = var.server_location
-    image = var.server_image
-    ssh_keys = [ hcloud_ssh_key._.id ]
+# ---------------------------
+# Nomad Clients config
+# ---------------------------
+resource "hcloud_server" "nomad_clients" {
+  name = "nomad-client-${count.index + 1}"
+  count = var.client_count
+  image = var.vm_image
+  location = var.location
+  server_type = var.server_type
+  ssh_keys = [ hcloud_ssh_key._.id ]
+  
+  network {
+    network_id = hcloud_network.nomad-network.id
+  }
 
-    network {
-      network_id = hcloud_network.nomad-network.id
-    }
+  connection {
+    host = self.ipv4_address
+    type = "ssh"
+    user = "root"
+    private_key = tls_private_key.ssh.private_key_pem
+  }
 
-    connection {
-      host = self.ipv4_address
-      type = "ssh"
-      user = "root"
-      private_key = tls_private_key.ssh.private_key_pem
-    }
+  depends_on = [ hcloud_network_subnet.nomad-network-subnet ]
 
-    depends_on = [ 
-        hcloud_network_subnet.nomad-network-subnet
+  provisioner "file" {
+    source = "scripts/nomad-installations.sh"
+    destination = "/tmp/nomad-installations.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [ 
+      # Add executable permission to the sript.
+      "chmod +x /tmp/nomad-installations.sh",
+      "/tmp/nomad-installations.sh"
      ]
+  }
 }
+
+# ---------------------------
+# Nomad Servers setup
+# ---------------------------
+resource "null_resource" "nomad_servers_post_script" {
+  count = var.server_count
+  depends_on = [ hcloud_server.nomad_servers ]
+
+  connection {
+    type = "ssh"
+    user = "root"
+    host = hcloud_server.nomad_servers[count.index].ipv4_address
+    private_key = tls_private_key.ssh.private_key_pem
+  }
+
+  provisioner "file" {
+    source = "scripts/nomad-server-setup.sh"
+    destination = "/tmp/nomad-server-setup.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [ 
+      # Add executable permission to the script.
+      "chmod +x /tmp/nomad-server-setup.sh",
+      "/tmp/nomad-server-setup.sh ${count.index + 1} ${var.server_count} ${var.location} ${jsonencode([for server in hcloud_server.nomad_servers : "\"${(server.network[*].ip)[0]}\""])} ${hcloud_network.nomad-network.ip_range}"
+     ]
+  }
+}
+# ---------------------------
+# Nomad Clients setup
+# ---------------------------
+resource "null_resource" "nomad_clients_post_script" {
+  count = var.client_count
+  depends_on = [ hcloud_server.nomad_clients, null_resource.nomad_servers_post_script ]
+
+  connection {
+    type = "ssh"
+    user = "root"
+    host = hcloud_server.nomad_clients[count.index].ipv4_address
+    private_key = tls_private_key.ssh.private_key_pem
+  }
+
+  provisioner "file" {
+    source = "scripts/nomad-client-setup.sh"
+    destination = "/tmp/nomad-client-setup.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [ 
+      # Add executable permission to the script.
+      "chmod +x /tmp/nomad-client-setup.sh",
+      "/tmp/nomad-client-setup.sh ${count.index + 1} ${var.location} ${jsonencode([for server in hcloud_server.nomad_servers : "\"${(server.network[*].ip)[0]}\""])} ${hcloud_network.nomad-network.ip_range}"
+     ]
+  }
+}
+
 
 # ---------------------------
 # SSH config

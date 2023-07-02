@@ -1,81 +1,47 @@
 variable "hcloud_token" {
   default = ""
-  description = "Hetzner Cloud API token"
+  description = "Hetzner Cloud API token."
 }
+
+# variable "ssh_keys" {
+#   description = "List of SSH keys to use for connecting to the instances."  
+# }
 
 variable "prefix" {
-    type = string
-    default = "nomad-tf"
+  description = "Prefix tag to use for the cluster."
+  default = "NCLUSTER"
 }
 
-variable "server_name" {
-  description = "The name of the server"
-  type = string
-  default = "nomad-tf"
-}
-
-variable "server_location" {
-  description = "Location of the server"
+variable "location" {
+  description = "The Hetzner region for the instances."
   type = string
   default = "fsn1"
 }
 
-variable "server_type" {
-  description = "The type of server to run for each node in the cluster"
-  type = string
-  default = "cax11"
-}
-
-variable "server_image" {
-  description = "The image of the server"
+variable "vm_image" {
+  description = "The image to use for the instances."
   type = string
   default = "ubuntu-22.04"
 }
 
 variable "server_count" {
-  description = "Number of servers (Default: 3)"
+  description = "The number of Nomad/Consul server instances."
   type = number
-  default = 3
+  default = 2
 }
 
-variable "enable_letsencrypt" {
-  description = "Enable cert provisioning via Let's Encrypt"
-  type = bool
-  default = true
+variable "client_count" {
+  description = "The number of Nomad/Consul client instances."
+  type = number
+  default = 2
 }
 
-variable "dns_host" {
-  description = "The DNS host to use for construction of the root domain for apps"
-  type = string
-  default = "sslip.io"
+variable "server_type" {
+  description = "The instance type for the server instances"
+  default = "cax11"
 }
 
-variable "allowed_ssh_cidr_blocks" {
-  description = "A list of CIDR-formatted IP address ranges from which the server will allow SSH connections"
-  type = list(string)
-  default = [ "0.0.0.0/0" ]
-}
-
-variable "allowed_inbound_cidr_blocks" {
-  description = "A list of CIDR-formatted IP address ranges from which the server will allow connections"
-  type = list(string)
-  default = [ "0.0.0.0/0" ]
-}
-
-variable "allow_outbound_cidr_blocks" {
-  description = "Allow outbound traffic to these CIDR blocks"
-  type        = list(string)
-  default = [ "0.0.0.0/0" ]
-}
-
-variable "allow_inbound_http_nomad" {
-  description = "Allow inbound connections to the unsecured NOMAD API http port"
-  type = bool
-  default = false
-}
-
-variable "allow_inbound_http_consul" {
-  description = "Allow inbound connections to the unsecured Consul API http port"
-  type = bool
-  default = false
+variable "client_type" {
+  description = "The instance type for the client instances"
+  default = "cax11"
 }
