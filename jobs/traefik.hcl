@@ -1,28 +1,26 @@
 job "traefik" {
-  region      = "global"
   datacenters = ["dc-fsn1-1"]
-  type        = "service"
+  type        = "system"
 
   group "traefik" {
-    count = 1
-
     network {
-      port "http" {
-        static = 8080
+      port "web" {
+        static = 80
       }
 
-      port "api" {
-        static = 8081
+      port "websecure" {
+        static = 443
       }
     }
 
     service {
       name = "traefik"
+      port = "web"
 
       check {
-        name     = "alive"
-        type     = "tcp"
-        port     = "http"
+        type     = "http"
+        path     = "/ping"
+        port     = "web"
         interval = "10s"
         timeout  = "2s"
       }
@@ -32,37 +30,47 @@ job "traefik" {
       driver = "docker"
 
       config {
-        image        = "traefik:v2.2"
+        image        = "traefik:v2.10.3"
         network_mode = "host"
 
         volumes = [
-          "local/traefik.toml:/etc/traefik/traefik.toml",
+          "local/traefik.yaml:/etc/traefik/traefik.yaml",
         ]
       }
 
       template {
         data = <<EOF
-[entryPoints]
-    [entryPoints.http]
-    address = ":8080"
-    [entryPoints.traefik]
-    address = ":8081"
-
-[api]
-    dashboard = true
-    insecure  = true
-
-# Enable Consul Catalog configuration backend.
-[providers.consulCatalog]
-    prefix           = "traefik"
-    exposedByDefault = false
-
-    [providers.consulCatalog.endpoint]
-      address = "127.0.0.1:8500"
-      scheme  = "http"
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+  traefik:
+    address: ":8081"
+api:
+  dashboard: true
+  insecure: true
+ping:
+  entryPoint: "web"
+providers:
+  consulCatalog:
+    prefix: "traefik"
+    exposedByDefault: false
+    endpoint:
+      address: "127.0.0.1:8500"
+      scheme: "http"
+certificatesResolvers:
+  letsencrypt-tls:
+    acme:
+      # Supply an email to get cert expiration notices
+      # email = "you@example.com"
+      # The CA server is toggled to staging for testing/avoiding rate limits
+      caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+      storage: "/acme.json"
+      tlsChallenge: true
 EOF
 
-        destination = "local/traefik.toml"
+        destination = "local/traefik.yaml"
       }
 
       resources {

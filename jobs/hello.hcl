@@ -6,7 +6,7 @@ job "demo-webapp" {
 
     network {
       port  "http"{
-        to = 80
+        to = 8080
       }
     }
 
@@ -17,6 +17,9 @@ job "demo-webapp" {
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.hello.rule=Host(`hello.petrub.dev`)",
+        "traefik.http.routers.hello.entryPoints=websecure",
+        "traefik.http.routers.hello.tls=true",
+        "traefik.http.routers.hello.tls.certresolver=letsencrypt-tls",
       ]
 
       check {
